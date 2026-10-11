@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive PDE Heat Equation Visualizer | Dirichlet, Neumann & Robin Conditions</title>
+    <meta name="description"
+        content="Interactive illustrative learning tool for Partial Differential Equations (PDEs). Visualize 1D rod and 2D plate heat diffusion, boundary conditions, flux vectors, and 3D spacetime graphs live.">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
+    <!-- KaTeX for LaTeX Math Typesetting -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+
+    <!-- Plotly.js for Live 2D & 3D WebGL Scientific Plots -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="app-container">
+
+        <!-- Top Header Navigation -->
+        <header class="app-header">
+            <div class="brand-wrapper">
+                <div class="brand-icon">🔥</div>
+                <div class="brand-titles">
+                    <h1>PDE Heat Equation Studio</h1>
+                    <div class="brand-subtitle">&part;u/&part;t = &beta;&nabla;&sup2;u + f(x, y, t) &bull; Finite
+                        Difference Simulator</div>
+                </div>
+            </div>
+
+            <div class="header-meta">
+                <div id="status-badge" class="header-status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Paused</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Quick Presets Bar -->
+        <nav class="presets-bar" aria-label="Simulation Presets">
+            <span class="presets-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon
+                        points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+                Presets:
+            </span>
+            <button class="preset-chip active" data-preset="dirichlet_zero">1. Dirichlet Fixed Ends (u=0)</button>
+            <button class="preset-chip" data-preset="neumann_insulated">2. Neumann Insulated Ends
+                (&part;u/&part;x=0)</button>
+            <button class="preset-chip" data-preset="robin_cooling">3. Robin Convective Cooling (Newton)</button>
+            <button class="preset-chip" data-preset="lecture_harmonics">4. Fourier Harmonics Damping (Lecture)</button>
+            <button class="preset-chip" data-preset="heat_source">5. Central Heat Source (Forcing f)</button>
+            <button class="preset-chip" data-preset="plate_2d">6. 2D Square Plate Diffusion</button>
+        </nav>
+
+        <!-- Main Interactive Workspace Grid -->
+        <main class="main-layout">
+
+            <!-- Left Controls Sidebar -->
+            <aside class="controls-sidebar">
+                <div class="sidebar-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="4" y1="21" x2="4" y2="14" />
+                        <line x1="4" y1="10" x2="4" y2="3" />
+                        <line x1="12" y1="21" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12" y2="3" />
+                        <line x1="20" y1="21" x2="20" y2="16" />
+                        <line x1="20" y1="12" x2="20" y2="3" />
+                        <line x1="1" y1="14" x2="7" y2="14" />
+                        <line x1="9" y1="8" x2="15" y2="8" />
+                        <line x1="17" y1="16" x2="23" y2="16" />
+                    </svg>
+                    Simulation Controls
+                </div>
+
+                <!-- 1. Spatial Dimension -->
+                <div class="control-section">
+                    <span class="section-label">1. Spatial Dimension</span>
+                    <div id="dimension-toggle" class="toggle-group">
+                        <button class="toggle-btn active" data-value="1d">
+                            <span>➖ 1D Thin Rod</span>
+                        </button>
+                        <button class="toggle-btn" data-value="2d">
+                            <span>⬛ 2D Square Plate</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. Thermal Diffusivity Beta -->
+                <div class="control-section">
+                    <span class="section-label">2. Thermal Diffusivity (&beta;)</span>
+                    <div class="control-group">
+                        <label for="beta-input">
+                            <span>Parameter &beta; = k / (c&rho;)</span>
+                            <span class="param-desc">[m&sup2;/s]</span>
+                        </label>
+                        <div class="slider-input-pair">
+                            <input type="range" id="beta-slider" min="-3" max="0" step="0.01" value="-2"
+                                title="Logarithmic beta slider">
+                            <input type="number" id="beta-input" value="0.0100" min="0.001" max="1.0" step="0.001">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Boundary Conditions -->
+                <div class="control-section">
+                    <span class="section-label">3. Boundary Condition Type</span>
+                    <div class="control-group">
+                        <select id="bc-select" class="select-input">
+                            <option value="dirichlet" selected>Dirichlet Conditions (Fixed Temp)</option>
+                            <option value="neumann">Neumann Conditions (Insulated / Flux)</option>
+                            <option value="robin">Robin Conditions (Convective Cooling)</option>
+                        </select>
+                    </div>
+                    <div id="bc-params-container" class="bc-params-box">
+                        <!-- Populated dynamically via app.js -->
+                    </div>
+                </div>
+
+                <!-- 4. Initial Condition -->
+                <div class="control-section">
+                    <span class="section-label">4. Initial State u(x, y, 0)</span>
+                    <div class="control-group">
+                        <select id="ic-select" class="select-input">
+                            <option value="sine" selected>Fundamental Sine Wave &bull; sin(&pi;x/L)</option>
+                            <option value="harmonics">Fourier Multi-Harmonics &bull; 3sin(2x) - 6sin(5x)</option>
+                            <option value="gaussian">Gaussian Heat Pulse &bull; exp(-60(x-L/2)&sup2;)</option>
+                            <option value="step">Step Discontinuity (Cold Half / Hot Half)</option>
+                            <option value="triangle">Triangular Peak (Sharp Gradient)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 5. Forcing Function -->
+                <div class="control-section">
+                    <span class="section-label">5. Internal Heat Source Q / c&rho;</span>
+                    <div class="control-group">
+                        <select id="forcing-select" class="select-input">
+                            <option value="none" selected>No Forcing &bull; f(x, y, t) = 0 (Homogeneous)</option>
+                            <option value="center">Point Heat Source &bull; Center Heating Element</option>
+                            <option value="uniform">Uniform Heat Generation &bull; Constant Joulean Heat</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 6. Simulation Speed -->
+                <div class="control-section">
+                    <span class="section-label">Simulation Speed</span>
+                    <div class="speed-group">
+                        <button class="speed-btn" data-speed="slow">0.25&times; Slow</button>
+                        <button class="speed-btn active" data-speed="normal">1.0&times; Normal</button>
+                        <button class="speed-btn" data-speed="fast">4.0&times; Fast</button>
+                    </div>
+                </div>
+
+                <!-- Action Buttons: Play / Pause & Reset -->
+                <div class="action-buttons-group">
+                    <button id="btn-play" class="btn-primary" title="Start or Pause Heat Diffusion">
+                        <span class="play-icon">▶</span>
+                        <span class="play-text">Start Simulation</span>
+                    </button>
+                    <button id="btn-reset" class="btn-secondary" title="Reset Simulation to Initial State">
+                        <span>↺</span>
+                        <span>Reset</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Right Visual Stage & Live Graphs -->
+            <section class="main-content">
+
+                <!-- Primary Physical Body Canvas Stage -->
+                <div class="stage-panel">
+                    <div class="stage-header">
+                        <div class="stage-title-wrap">
+                            <h2 class="stage-title">Live Physical Heat Visualization</h2>
+                            <span class="stage-badge" id="body-type-badge">1D Metallic Rod</span>
+                        </div>
+                        <div class="stage-equation-box">
+                            <span class="eq-label">Governing PDE:</span>
+                            <div id="equation-display"></div>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Box with heat particles & arrows -->
+                    <div class="canvas-container">
+                        <canvas id="body-canvas"></canvas>
+
+                        <!-- Steady State Banner Overlay -->
+                        <div id="steady-state-overlay" class="overlay-message hidden">
+                            <span class="overlay-icon">✓</span>
+                            <div>
+                                <strong>Equilibrium Reached</strong>
+                                <div>Rate of change &part;u/&part;t &lt; 10⁻⁷ (Steady State)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Thermal Colormap Legend & Live Statistics -->
+                    <div class="stage-footer">
+                        <div class="legend-box">
+                            <span class="legend-title">Temperature u:</span>
+                            <div class="legend-gradient-bar legend-gradient"></div>
+                            <div class="legend-values">
+                                <span id="legend-min">0.00</span>
+                                <span>&rarr;</span>
+                                <span id="legend-mid">0.50</span>
+                                <span>&rarr;</span>
+                                <span id="legend-max">1.00</span>
+                            </div>
+                        </div>
+
+                        <div class="stats-strip">
+                            <div class="stat-item">
+                                <span class="stat-label">Sim Time (t)</span>
+                                <span id="stat-time" class="stat-val">0.000</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Max Temp</span>
+                                <span id="stat-max" class="stat-val">1.0000</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Min Temp</span>
+                                <span id="stat-min" class="stat-val">0.0000</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Steps</span>
+                                <span id="stat-steps" class="stat-val">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dual Live Plotly Graphs (2D & 3D) -->
+                <div class="graphs-grid">
+                    <div class="graph-card">
+                        <div class="graph-header">
+                            <h3>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                                </svg>
+                                <span id="graph-2d-title">Temperature Profile u(x, t)</span>
+                            </h3>
+                            <span class="graph-subtitle">Live Spatial Slice</span>
+                        </div>
+                        <div id="graph-2d" class="graph-plot-area"></div>
+                    </div>
+
+                    <div class="graph-card">
+                        <div class="graph-header">
+                            <h3>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                                    <polyline points="2 17 12 22 22 17" />
+                                    <polyline points="2 12 12 17 22 12" />
+                                </svg>
+                                <span id="graph-3d-title">Spacetime Evolution u(x, t)</span>
+                            </h3>
+                            <span class="graph-subtitle">3D Surface / Spacetime Map</span>
+                        </div>
+                        <div id="graph-3d" class="graph-plot-area"></div>
+                    </div>
+                </div>
+
+                <!-- Educational Pedagogical Companion (Explaining the PDE Concepts) -->
+                <section class="educational-section" id="edu-section">
+                    <div class="edu-header" id="edu-header" title="Toggle Educational Reference">
+                        <div class="edu-title">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                            </svg>
+                            PDE Heat Equation Theory &amp; Physical Intuition.
+                        </div>
+                        <span class="edu-toggle-icon">▼</span>
+                    </div>
+
+                    <div class="edu-body">
+                        <div class="edu-card">
+                            <h4>🔥 1. Heat Conduction &amp; Diffusivity</h4>
+                            <p>
+                                Derived from <strong>Fourier's Law of Heat Conduction</strong>
+                                (<math>
+                                    <mi>q</mi>
+                                    <mo>=</mo>
+                                    <mo>−</mo>
+                                    <mi>k</mi>
+                                    <mo>∇</mo>
+                                    <mi>u</mi>
+                                </math>) and
+                                thermal conservation. The parameter &beta; is the <em>thermal diffusivity</em>:
+                            </p>
+                            <div class="edu-math-box">
+                                <math>
+                                    <mi>&beta; = </mi>
+                                    <mfrac>
+                                        <mi>k</mi>
+                                        <mrow>
+                                            <mi>c</mi>
+                                            <mi>&rho;</mi>
+                                        </mrow>
+                                    </mfrac>
+                                </math>
+                                &emsp;&bull;&emsp;
+                                <math>
+                                    <mfrac>
+                                        <mrow>
+                                            <mo>&part;</mo>
+                                            <mi>u</mi>
+                                        </mrow>
+                                        <mrow>
+                                            <mo>&part;</mo>
+                                            <mi>t</mi>
+                                        </mrow>
+                                    </mfrac>
+                                    <mo>=</mo>
+                                    <mi>&beta;</mi>
+                                    <msup>
+                                        <mo>&nabla;</mo>
+                                        <mn>2</mn>
+                                    </msup>
+                                    <mi>u</mi>
+                                    <mo>+</mo>
+                                    <mfrac>
+                                        <mrow>
+                                            <mi>Q</mi>
+                                            <mo>(</mo>
+                                            <mi>x</mi>
+                                            <mo>,</mo>
+                                            <mi>t</mi>
+                                            <mo>)</mo>
+                                        </mrow>
+                                        <mrow>
+                                            <mi>c</mi>
+                                            <mi>&rho;</mi>
+                                        </mrow>
+                                    </mfrac>
+                                </math>
+                            </div>
+                            <p>
+                                High <math>
+                                    <mi>&beta;</mi>
+                                </math> diffuses heat rapidly; low <math>
+                                    <mi>&beta;</mi>
+                                </math> acts like a thermal insulator.
+                            </p>
+                        </div>
+
+                        <div class="edu-card">
+                            <h4>🛡️ 2. Boundary Conditions Compared</h4>
+                            <p>
+                                <strong>Dirichlet:</strong> Fixed boundary temperatures
+                                <math>
+                                    <mi>u</mi>
+                                    <mo>(</mo>
+                                    <mn>0</mn>
+                                    <mo>,</mo>
+                                    <mi>t</mi>
+                                    <mo>)</mo>
+                                    <mo>=</mo>
+                                    <msub>
+                                        <mi>T</mi>
+                                        <mn>0</mn>
+                                    </msub>
+                                </math>,
+                                <math>
+                                    <mi>u</mi>
+                                    <mo>(</mo>
+                                    <mi>L</mi>
+                                    <mo>,</mo>
+                                    <mi>t</mi>
+                                    <mo>)</mo>
+                                    <mo>=</mo>
+                                    <msub>
+                                        <mi>T</mi>
+                                        <mi>L</mi>
+                                    </msub>
+                                </math>.
+                                Energy leaves or enters freely through the contacts.
+                            </p>
+                            <p>
+                                <strong>Neumann:</strong> Insulated boundaries
+                                <math>
+                                    <mfrac>
+                                        <mrow>
+                                            <mo>&part;</mo>
+                                            <mi>u</mi>
+                                        </mrow>
+                                        <mrow>
+                                            <mo>&part;</mo>
+                                            <mi>x</mi>
+                                        </mrow>
+                                    </mfrac>
+                                    <mo>=</mo>
+                                    <mn>0</mn>
+                                </math>.
+                                Heat flux is zero; total thermal energy in the body is strictly conserved!
+                            </p>
+                            <p>
+                                <strong>Robin:</strong> Newton's Law of Cooling
+                                <math>
+                                    <mo>−</mo>
+                                    <mi>k</mi>
+                                    <mfrac>
+                                        <mrow>
+                                            <mo>&part;</mo>
+                                            <mi>u</mi>
+                                        </mrow>
+                                        <mrow>
+                                            <mo>&part;</mo>
+                                            <mi>n</mi>
+                                        </mrow>
+                                    </mfrac>
+                                    <mo>=</mo>
+                                    <mi>h</mi>
+                                    <mo>(</mo>
+                                    <mi>u</mi>
+                                    <mo>−</mo>
+                                    <msub>
+                                        <mi>T</mi>
+                                        <mo>&infin;</mo>
+                                    </msub>
+                                    <mo>)</mo>
+                                </math>.
+                                Convective heat exchange with ambient atmosphere.
+                            </p>
+                        </div>
+
+                        <div class="edu-card">
+                            <h4>📈 3. Separation of Variables &amp; Damping</h4>
+                            <p>
+                                Expanding temperature into spatial eigenfunctions:
+                            </p>
+                            <div class="edu-math-box">
+                                <math>
+                                    <mi>u</mi>
+                                    <mo>(</mo>
+                                    <mi>x</mi>
+                                    <mo>,</mo>
+                                    <mi>t</mi>
+                                    <mo>)</mo>
+                                    <mo>=</mo>
+                                    <munderover>
+                                        <mo>&sum;</mo>
+                                        <mrow>
+                                            <mi>n</mi>
+                                            <mo>=</mo>
+                                            <mn>1</mn>
+                                        </mrow>
+                                        <mo>&infin;</mo>
+                                    </munderover>
+                                    <msub>
+                                        <mi>A</mi>
+                                        <mi>n</mi>
+                                    </msub>
+                                    <msup>
+                                        <mi>e</mi>
+                                        <mrow>
+                                            <mo>−</mo>
+                                            <mi>&beta;</mi>
+                                            <msup>
+                                                <mrow>
+                                                    <mo>(</mo>
+                                                    <mfrac>
+                                                        <mrow>
+                                                            <mi>n</mi>
+                                                            <mi>&pi;</mi>
+                                                        </mrow>
+                                                        <mi>L</mi>
+                                                    </mfrac>
+                                                    <mo>)</mo>
+                                                </mrow>
+                                                <mn>2</mn>
+                                            </msup>
+                                            <mi>t</mi>
+                                        </mrow>
+                                    </msup>
+                                    <mi>sin</mi>
+                                    <mo>(</mo>
+                                    <mfrac>
+                                        <mrow>
+                                            <mi>n</mi>
+                                            <mi>&pi;</mi>
+                                            <mi>x</mi>
+                                        </mrow>
+                                        <mi>L</mi>
+                                    </mfrac>
+                                    <mo>)</mo>
+                                </math>
+                            </div>
+                            <p>
+                                High spatial frequencies <math>
+                                    <mi>n</mi>
+                                </math> damp exponentially at a rate proportional to
+                                <math>
+                                    <msup>
+                                        <mi>n</mi>
+                                        <mn>2</mn>
+                                    </msup>
+                                </math>.
+                                In the <strong>Fourier Harmonics</strong> preset, high-frequency ripples (<math>
+                                    <mn>5</mn>
+                                    <mi>&pi;</mi>
+                                </math>)
+                                flatten almost instantaneously, leaving only the fundamental harmonic!
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Interactive PDE Heat Equation Visualizer &bull; Designed for illustrative learning</p>
+            <p>Under the supervision of <i>Dr. Ahmed AbdelSamea </i> &bull; Cairo Universiy &bull; Faculty of
+                Engineering</p>
+            <p>Made with love by <i>Eng. Ziad A. Abdelawad </i></p>
+        </footer>
+
+    </div>
+
+    <!-- Application Script Modules -->
+    <script src="js/solver.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
